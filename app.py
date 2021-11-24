@@ -1,6 +1,7 @@
 import pymongo
 import pandas as pd
 from pymongo import MongoClient
+import streamlit as st
 import passkey
 
 
@@ -11,5 +12,3 @@ db = client.EnergyData
 collection = db["Lake_Turkana"]
 data = pd.DataFrame(list(collection.find()))
 
-data.to_csv('dat')
-print(data.head)
