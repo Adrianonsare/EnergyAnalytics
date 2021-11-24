@@ -15,7 +15,8 @@ import datetime as datetime
 from datetime import date, timedelta
 import logging
 import streamlit as st
-
+import passkey
+import CreateDatabase
 # Get logging messages from winpowerlib
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -131,42 +132,8 @@ Pout['timestamp_local'] = pd.to_datetime(Pout['dt_txt'])
 Pout.set_index('timestamp_local', inplace=True)
 df_vals= list(Pout['feedin_power_plant'].unique())
 
-# _____________________________________________________________________
+# --------------------------------------------------------------------------
+CreateDatabase.collection_name.delete_many({"feedin_power_plant": df_vals})
+CreateDatabase.collection_name.insert_many(Pout.to_dict('records'))
 
 
-def get_database():
-    from pymongo import MongoClient
-    import pymongo
-
-    client = pymongo.MongoClient("mongodb+srv://adrianonsare:#PE$_vVB4tZp~#3@cluster0.r3enc.mongodb.net/myFirstDatabase?retryWrites=true&w=majority")
-
-    # Provide the mongodb atlas url to connect python to mongodb using pymongo
-    
-
-    # Create a connection using MongoClient. You can import MongoClient or use pymongo.MongoClient
-    # Create the database for our example (we will use the same database throughout the tutorial
-    return client['New_Data']
-    
-# This is added so that many files can reuse the function get_database()
-if __name__ == "__main__":    
-    
-    # Get the database
-    dbname = get_database()
-
-collection_name = dbname["Energy Data"]
-collection_name.insert_many(Pout.to_dict('records'))
-
-#Creating collections for the DB
-test_collection = collection_name.test.find()
-#Inserting into DB
-collection_name.test_collection.delete_many({"feedin_power_plant": df_vals})
-collection_name.test_collection.insert_many(Pout.to_dict("records"))
-
-
-# # if file does not exist write header 
-# if not os.path.isfile('Pout.csv'):
-#     Pout.to_csv('Pout.csv', header='column_names')
-# else: # else it exists so append without writing the header
-#     Pout.to_csv('Pout.csv', mode='a', header=False)
-
-# df=pd.read_csv('Pout.csv')
