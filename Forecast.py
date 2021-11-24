@@ -58,11 +58,13 @@ dat_weath['temp'] = dat_weath['temp']+273
 dat_weath['pressure'] = dat_weath['pressure']*100
 # Select fields that windpowerlib accepts as inputs
 dat_weath = dat_weath[['dt_txt', 'speed', 'temp', 'pressure']]
+weather_dat=dat_weath.copy()
 # Rename columns
 dat_weath = dat_weath.rename(
     columns={'speed': 'wind_speed', 'temp': 'temperature', 'pressure': 'pressure'})
 # Set index
 dat_weath = dat_weath.set_index('dt_txt')
+weather_dat=dat_weath.copy().reset_index()
 
 # ---------------------------------------------------------------------------
 # set a value to roughness index and hub height
