@@ -17,6 +17,7 @@ import logging
 import streamlit as st
 import passkey
 import CreateDatabase
+# from pymongo import updateMany
 # Get logging messages from winpowerlib
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -26,19 +27,18 @@ latitude = 2.48903
 longitude = 36.79317
 tz = 'Africa/Nairobi'
 
-# Set start and end date for the wind turbine power calculations
-# Time period goes back 12 days
-end = pd.Timestamp(datetime.date.today(), tz=tz)
-start = end - timedelta(12)
-
+# Open Weather API free version offers access to 5 day forecasts at 3hour intervals
 # Obtain weather data from the Open weather API
 lat = latitude
 lon = longitude
-urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s" % (
+urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=metric" % (
     lat, lon, config.api_key)
 
 # Run requests from the API
 jsonDatas = requests.get(urls).json()
+#CreateDatabase.collection_name.delete_many({"feedin_power_plant": df_vals})
+
+#CreateDatabase.collection_name.insert_many(jsonDatas['list'])
 dat_weath = pd.DataFrame(jsonDatas['list'])
 
 
@@ -53,28 +53,34 @@ dat_weath = pd.concat([dat_weath, main, wind, weather], axis=1).drop(['main', 'w
 
 # Feature Engineering
 # Temperature conversion from Kelvin to Celsius for input into model
-dat_weath['temp'] = dat_weath['temp']+273
-# Pressure conversion to pascals
-dat_weath['pressure'] = dat_weath['pressure']*100
+# dat_weath['temp'] = dat_weath['temp']+273
+# # Pressure conversion to pascals
+# dat_weath['pressure'] = dat_weath['pressure']*100
 # Select fields that windpowerlib accepts as inputs
 dat_weath = dat_weath[['dt_txt', 'speed', 'temp', 'pressure']]
-weather_dat=dat_weath.copy()
+
 # Rename columns
 dat_weath = dat_weath.rename(
     columns={'speed': 'wind_speed', 'temp': 'temperature', 'pressure': 'pressure'})
+print(dat_weath.head())
 # Set index
-dat_weath = dat_weath.set_index('dt_txt')
+dat_weath=dat_weath.rename(columns={'dt_txt':'Timestamp'})
+dat_weath = dat_weath.set_index('Timestamp')
 weather_dat=dat_weath.copy().reset_index()
 
 # ---------------------------------------------------------------------------
-# set a value to roughness index and hub height
+# set a value to roughness index and windspeed measurement height
 dat_weath['roughness_length'] = 0.001
 dat_weath['height'] = 8
 # Input requires multilevel index
 dat_weath = dat_weath.set_index('height', append=True).unstack('height')
 
+
 # ----------------------------------------------------------------------------
-# specification of own wind turbine (Note: power curve values and
+# Windpowerlib has a library of wind turbines, if turbine does not exist, it can be created
+# specification of  wind turbine
+# #Created by defining nominal power, hub height, and power curve values
+# (Note: power curve values and
 # nominal power have to be in Watt)
 my_vestas_turbine = {
     'nominal_power': 850e3,  # in W
@@ -130,12 +136,23 @@ my_vestas_turbine.power_output
 Pout = my_vestas_turbine.power_output.reset_index()
 
 # ---------------------------------------------------------------------------
-Pout['timestamp_local'] = pd.to_datetime(Pout['dt_txt'])
+Pout['timestamp_local'] = pd.to_datetime(Pout['Timestamp'])
 Pout.set_index('timestamp_local', inplace=True)
 df_vals= list(Pout['feedin_power_plant'].unique())
 
-# --------------------------------------------------------------------------
-CreateDatabase.collection_name.delete_many({"feedin_power_plant": df_vals})
+# dictus={'_id': ObjectId('619fb9f00e55a81274e516d6'), 'Timestamp': '2021-11-30 15:00:00', 'feedin_power_plant': 307.8332449088555}
+# for x in CreateDatabase.collection_name.find():
+#     print(x)
+
 CreateDatabase.collection_name.insert_many(Pout.to_dict('records'))
+# --------------------------------------------------------------------------
+# CreateDatabase.collection_name.delete_many({"feedin_power_plant": df_vals})
+#CreateDatabase.collection_name.update_many({},Pout.to_dict('records'),upsert=True)
+# PowerData=Pout.to_dict('records')
+# requests=[]
+# for j in PowerData:
+#     CreateDatabase.collection_name.update_many({'_id':j['_id']},
+#     {'$set':{'feedin_power_plant':j['feedin_power_plant']}},
+#     upsert=True)
 
-
+   
