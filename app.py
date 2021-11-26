@@ -171,33 +171,23 @@ Turbine.power_output = mc_example_turbine.power_output
 
 Turbine.power_output = (Turbine.power_output)/10**6
 Turbine.power_output
-Pout = Turbine.power_output.reset_index()
-Pout['timestamp_local'] = pd.to_datetime(Pout['Timestamp'])
-Pout.set_index('timestamp_local', inplace=True)
+@st.cache()
+def outputdat():
+
+    Pout = Turbine.power_output.reset_index()
+    Pout['timestamp_local'] = pd.to_datetime(Pout['Timestamp'])
+    Pout.set_index('timestamp_local', inplace=True)
+    #Drop "_id" column added by mongoDB as a document field identifier
+    # Pout=Pout.drop(columns='_id')
+    #Drop duplicates
+    Pout=Pout.drop_duplicates(subset='Timestamp')
+    return Pout
+Pout=outputdat()
 
 ###################################################################
 
-# @st.cache(ttl=3600, max_entries=10)
-# def hubrange(a,b,c):
-#     min=a
-#     defaultval=b
-#     maxval=c
-#     return min,defaultval,maxval
-# min,defaultval,maxval= hubrange(0,0,100)
-# HubHeight=st.sidebar.slider("Select Hub Height",0,0,100)
-
-
-#Drop "_id" column added by mongoDB as a document field identifier
-data=data.drop(columns='_id')
-#Drop duplicates
-data=Pout.copy()
-data=data.drop_duplicates(subset='Timestamp')
-
-# Plot power output using plotly  express
-# Create figure
-
-PowerPlot = px.line(data,
-    x=data.index, y=data.feedin_power_plant,
+PowerPlot = px.line(Pout,
+    x=Pout.index, y=Pout.feedin_power_plant,
     color_discrete_sequence=["red"],
     title='Forecast Power Production',
     labels={'feedin_power_plant': 'Power Output(MW)'},
@@ -205,10 +195,7 @@ PowerPlot = px.line(data,
 
 st.plotly_chart(PowerPlot)
 
-
-#Plot Wind speeds
-# st.write('''### Plot of Weather Data
-# ''')
+##################################################################################
 Forecast.weather_dat=Forecast.weather_dat.drop_duplicates()
 Forecast.weather_dat['date']=pd.to_datetime(Forecast.weather_dat['Timestamp'])
 Forecast.weather_dat=Forecast.weather_dat.set_index('date')
