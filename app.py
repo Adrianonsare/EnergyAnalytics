@@ -183,10 +183,11 @@ def outputdat():
     Pout=Pout.drop_duplicates(subset='Timestamp')
     return Pout
 Pout=outputdat()
+PoutDisp=st.dataframe(Pout)
 
 ###################################################################
 
-PowerPlot = px.line(Pout,
+PowerPlot = px.line(outputdat(),
     x=Pout.index, y=Pout.feedin_power_plant,
     color_discrete_sequence=["red"],
     title='Forecast Power Production',

@@ -62,7 +62,7 @@ dat_weath = dat_weath[['dt_txt', 'speed', 'temp', 'pressure']]
 # Rename columns
 dat_weath = dat_weath.rename(
     columns={'speed': 'wind_speed', 'temp': 'temperature', 'pressure': 'pressure'})
-print(dat_weath.head())
+# print(dat_weath.head())
 # Set index
 dat_weath=dat_weath.rename(columns={'dt_txt':'Timestamp'})
 dat_weath = dat_weath.set_index('Timestamp')
@@ -138,13 +138,37 @@ Pout = my_vestas_turbine.power_output.reset_index()
 # ---------------------------------------------------------------------------
 Pout['timestamp_local'] = pd.to_datetime(Pout['Timestamp'])
 Pout.set_index('timestamp_local', inplace=True)
-df_vals= list(Pout['feedin_power_plant'].unique())
+
+
+df_vals= list(Pout['Timestamp'].unique())
+CreateDatabase.collection_name.delete_many({"Timestamp": df_vals})
 
 # dictus={'_id': ObjectId('619fb9f00e55a81274e516d6'), 'Timestamp': '2021-11-30 15:00:00', 'feedin_power_plant': 307.8332449088555}
 # for x in CreateDatabase.collection_name.find():
 #     print(x)
 
+
 CreateDatabase.collection_name.insert_many(Pout.to_dict('records'))
+
+# ################################################################3
+
+# cursor = CreateDatabase.collection_name.aggregate(
+#     [
+#         {"$group": {"_id": "$feedin_power_plant", "unique_dat": {"$addToSet": "$_id"}, "count": {"$sum": 1}}},
+#         {"$match": {"count": { "$gte": 2 }}}
+#     ]
+# )
+
+# response = []
+# for doc in cursor:
+#     del doc["unique_dat"][0]
+#     for id in doc["unique_dat"]:
+#         response.append(id)
+
+# CreateDatabase.collection_name.delete_many({"_id": {"$in": response}})
+
+
+
 # --------------------------------------------------------------------------
 # CreateDatabase.collection_name.delete_many({"feedin_power_plant": df_vals})
 #CreateDatabase.collection_name.update_many({},Pout.to_dict('records'),upsert=True)
