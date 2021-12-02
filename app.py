@@ -71,7 +71,7 @@ if Calculate:
     def loadWeatherData():
         lat = InputLatitude
         lon = InputLongitude
-        urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=standard" % (lat, lon, st.secrets.api_key)
+        urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=standard" % (lat, lon, st.secrets["api_key"])
         # Run requests from the API
         jsonDatas = requests.get(urls).json()
         dat_weath = pd.DataFrame(jsonDatas['list'])
