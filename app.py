@@ -1,8 +1,8 @@
 import pandas as pd
 import streamlit as st
-import passkey
+# import passkey
 import requests
-import config
+# import config
 from windpowerlib import ModelChain, WindTurbine, create_power_curve,TurbineClusterModelChain, WindTurbineCluster, WindFarm
 import plotly.graph_objects as go
 import plotly.express as px
@@ -76,7 +76,7 @@ if Calculate:
     def loadWeatherData():
         lat = InputLatitude
         lon = InputLongitude
-        urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=standard" % (lat, lon, config.api_key)
+        urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=standard" % (lat, lon, st.secrets["api_key"])
         # Run requests from the API
         jsonDatas = requests.get(urls).json()
         dat_weath = pd.DataFrame(jsonDatas['list'])
