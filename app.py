@@ -12,7 +12,7 @@ import os
 
 lat = 2
 lon = 35.5
-urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=standard" % (lat, lon,st.secrets["api_credentials"])
+urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=standard" % (lat, lon,st.secrets["api_key"])
 
 
 # Streamlit App Title
