@@ -13,8 +13,8 @@ from bokeh.models import ColumnDataSource, GMapOptions
 from bokeh.plotting import gmap
 import altair as alt
 from windpowerlib import data as wt
-import logging
-logging.getLogger().setLevel(logging.DEBUG)
+
+
 # Streamlit App Title
 st.title("Wind Farm Analyser")
 st.markdown("""
@@ -24,29 +24,27 @@ wind farm sites. It makes use of the followign resurces.
  to predict wind turbine and wind farm output.
 * **Open Weather API** : This is an interface which provided weather forecasts for geoloecated places.
 """)
-
-# st.write(""" ### Forecast Model for Lake Turkana Wind
-
-# """)
 st.sidebar.info("Select and Enter Calculation Parameters")
-# @st.cache
+
+#Import turbine Database from Records
 def turbinedata():
     #Select Turbine
     turbines = wt.get_turbine_types(print_out=False)
-    #Select Turbine Manufacturer
+    
     
     return turbines
 turbines=turbinedata()
+#Select Unique Turbine Manufacturer
 TurbineMake=turbines.manufacturer.drop_duplicates()
 
-
+# Select box to allow user to select turbine make and model
 col1, col2 = st.columns(2)
 with col1:
-    MakeSelect=st.selectbox("Select Turbine Make",TurbineMake)#data.dt_txt)
+    MakeSelect=st.selectbox("Select Turbine Make",TurbineMake)
     st.write(MakeSelect)
 with col2:
     TurbineModel= turbines ['turbine_type'].loc[turbines ['manufacturer']== MakeSelect]
-    ModelSelect=st.selectbox("Select Turbine Model",TurbineModel)#data.dt_txt)
+    ModelSelect=st.selectbox("Select Turbine Model",TurbineModel)
     st.write(ModelSelect)
 
 #Hub Height Selector
@@ -58,18 +56,6 @@ def hubrange(a,b,c):
     return minval,defaultval,maxval
 minval,defaultval,maxval= hubrange(0,0,100)
 
-#User inputs
-# myForm=st.sidebar.form(key="my_form")
-# WindFarmName=myForm.text_input(" Enter Farm Name")
-# InputLatitude=myForm.number_input(" Enter Latitude")
-# InputLongitude=myForm.number_input(" Enter Longitude")
-# InputRoughLength=myForm.number_input(" Enter Roughness Length")
-# NoTurbines=myForm.number_input(" Enter Turbine Qty")
-# WindHeight=myForm.number_input(" Wind Measurement Height")
-# HubHeight=myForm.slider("Select Hub Height",minval,defaultval,maxval)
-# FarmEfficiency=myForm.number_input(" Farm Efficiency")
-# submit=myForm.form_submit_button("Submit")
-
 #####################################################################333333
 myForm=st.sidebar.form(key="my_form")
 WindFarmName=myForm.text_input(" Enter Farm Name")
@@ -80,11 +66,11 @@ NoTurbines=myForm.number_input(" Enter Turbine Qty")
 WindHeight=myForm.number_input(" Wind Measurement Height")
 HubHeight=myForm.slider("Select Hub Height",minval,defaultval,maxval)
 FarmEfficiency=myForm.number_input(" Farm Efficiency")
-submit=myForm.form_submit_button("Submit")
+Calculate=myForm.form_submit_button("Calculate")
 
 
-
-if submit:
+#If the user clicks the calculate button, then the rest of the script is executed
+if Calculate:
     #Load Weather Data
     @st.cache
     def loadWeatherData():
@@ -126,33 +112,20 @@ if submit:
     # Windpowerlib has a library of wind turbines, if turbine does not exist, it can be created
     # specification of  wind turbine
     # #Created by defining nominal power, hub height, and power curve values
-    # (Note: power curve values and
-    # nominal power have to be in Watt)
+    # (Note: power curve values and nominal power have to be in Watt)
 
     TurbineChoice = {
-        "turbine_type": ModelSelect,  # turbine type as in register
-        "hub_height": HubHeight,  # in m
+        "turbine_type": ModelSelect,  # turbine type as selected by user
+        "hub_height": HubHeight,  # in m as selected by user
     }
-    Turbine = WindTurbine(**TurbineChoice)
+    Turbine = WindTurbine(**TurbineChoice)#initiating turbine object
     
 
-    ###########################################################333
+    ##########################################################################
 
     # specification of wind farm data where turbine fleet is provided in a
     # pandas.DataFrame
-    # for each turbine type you can either specify the number of turbines of
-    # that type in the wind farm (float values are possible as well) or the
-    # total installed capacity of that turbine type in W
-    # FarmFleet = pd.DataFrame(
-    #         {'wind_turbine': [Turbine],  # as windpowerlib.WindTurbine
-    #          'number_of_turbines':[NoTurbines],
-    #          'total_capacity': [None]}
-    #     )
-    # # initialize WindFarm object
-    # MyFarm = WindFarm(name=WindFarmName,
-    #                         wind_turbine_fleet=FarmFleet)
-
-    ##############################################################333####3
+    # The number of turbines is specified by user
 
     FarmData= {
         'name': WindFarmName,
@@ -169,9 +142,9 @@ if submit:
     # write power output time series to WindFarm object
     WindFarmCalc.power_output = (mc_example_farm.power_output)/10**6
 
-    st.header("Analysis Output", anchor=None)
+    st.header("Analysis Results", anchor=None)
   
-    # @st.cache()
+    # Process power output time series into pandas dataframe
     def outputdat():
 
         Pout = WindFarmCalc.power_output.reset_index()
@@ -183,6 +156,7 @@ if submit:
 
     #Obtain Turbine Rating
     TurbineRating=int(TurbineChoice.get('turbine_type').split('/')[1])
+    #Plot select metrics
     with colz1:
         MedianPower=st.metric(label="Av. Forecast Power(MW)",value=round(Pout['feedin_power_plant'].mean(),2))
     with colz2:
@@ -192,21 +166,23 @@ if submit:
     with colz4:
         PRating=st.metric(label="Rated Capacity(MW)",value=round(NoTurbines*TurbineRating/10**3,2))
 
+
     ###########################################################################
+
+    #In this section, several plots are made,including power output,wind speed,correlation matrix,
+    # Power output histogram
 
     c = alt.Chart(Pout).mark_area(opacity=0.7, color='#FF0000').encode(
     x='Timestamp', y='feedin_power_plant').properties(
     width=700,
     height=450,title='Forecast Power Production for '+str(WindFarmName)+' Wind Farm')
     st.write(c)
-    
+#######################################################################################
 
-   
+    #Combine weather data with power output data   
     reweather=pd.melt(dat_weath.reset_index(), col_level=0, id_vars=['Timestamp','wind_speed','temperature','pressure'])
-    #st.write(reweather.head())
     
-
-
+    #Wind speed Plot
     SpeedPlot = px.line(reweather,
         x=reweather.Timestamp, y=reweather.wind_speed,
         color_discrete_sequence=["red"],
@@ -221,7 +197,7 @@ if submit:
     corr=combined.corr()
 
     
-        
+    #Correlation matrix
     corrplot = px.imshow(corr)
     st.markdown(""" #### Correlation Matrix of Power and Weather Variables""")
     st.write(corrplot)
@@ -242,41 +218,3 @@ if submit:
 )
         st.markdown(""" #### Wind Farm Power Curve """)
         st.write(scatChart)
-
-    # px.bar(reweather,
-    # x=reweather.Timestamp, y=reweather.wind_speed,
-    # color_discrete_sequence=["red"],
-    # title='Wind Speed Forecast for '+str(WindFarmName)+' Wind Farm',
-    # labels={'wind_speed': 'Wind Speed(m/s)'},height=500,
-    # width=800)
-    # st.write(SpeedPlot)
-    # st.table(combined.head())
-
-        # Plot the data
-
-
-    # c = alt.Chart(Pout).mark_line().encode(
-    #     x='Timestamp', y='feedin_power_plant').properties(
-    # width=700,
-    # height=500,title='Forecast Power Production for '+str(WindFarmName)+' Wind Farm')
-    # st.write(c)
-
-    
-    # # ##################################################################################
-    
-     
-    
-    # # # WeatherDat=WeatherDat.drop_duplicates()
-    # # WeatherDat['date']=pd.to_datetime(WeatherDat['dt_txt'])
-    # # WeatherDat=WeatherDat.set_index('date')
-    # # # Forecast.weather_dat=Forecast.weather_dat[StartDate:EndDate]
-    # # WeatherPlot = px.line(WeatherDat,
-    # #     x=WeatherDat.dt_txt, y=WeatherDat.speed,
-    # #     title='Site Wind Speed Over Time',
-    # #     labels={'dt_txt':'Date','wind_speed': 'Wind Speed(m/s)'},
-    # #     height=450,width=700)
-    # # WeatherPlot["layout"].pop("updatemenus")
-    # # # WeatherPlot.show()
-    # # #WeatherPlot["layout"].pop("updatemenus")
-
-    # # st.plotly_chart(WeatherPlot)
