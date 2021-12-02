@@ -8,6 +8,11 @@ import plotly.graph_objects as go
 import plotly.express as px
 import altair as alt
 from windpowerlib import data as wt
+import os 
+
+lat = 2
+lon = 35.5
+urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=standard" % (lat, lon,st.secrets["api_credentials"])
 
 
 # Streamlit App Title
@@ -71,7 +76,8 @@ if Calculate:
     def loadWeatherData():
         lat = InputLatitude
         lon = InputLongitude
-        urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=st.secrets.api_credentials&units=standard" % (lat, lon)
+        urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=st.secrets[api_key]&units=standard" % (lat, lon)
+        print(urls)
         # Run requests from the API
         jsonDatas = requests.get(urls).json()
         dat_weath = pd.DataFrame(jsonDatas['list'])
