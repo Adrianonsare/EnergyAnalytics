@@ -6,11 +6,6 @@ import requests
 from windpowerlib import ModelChain, WindTurbine, create_power_curve,TurbineClusterModelChain, WindTurbineCluster, WindFarm
 import plotly.graph_objects as go
 import plotly.express as px
-import seaborn as sns
-import matplotlib.pyplot as plt
-from bokeh.io import output_file, show
-from bokeh.models import ColumnDataSource, GMapOptions
-from bokeh.plotting import gmap
 import altair as alt
 from windpowerlib import data as wt
 
