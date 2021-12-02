@@ -1,3 +1,6 @@
+from pymongo import ASCENDING
+
+
 def get_database():
     from pymongo import MongoClient
     import pymongo
@@ -20,3 +23,4 @@ if __name__ == "__main__":
     dbname = get_database()
 dbname=get_database()
 collection_name = dbname["Lake_Turkana"]
+# collection_name.create_index([("idx",ASCENDING)],unique=True  )

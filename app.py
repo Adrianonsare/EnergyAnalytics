@@ -1,109 +1,35 @@
-from matplotlib.colors import PowerNorm
-import pymongo
 import pandas as pd
-from pymongo import MongoClient
 import streamlit as st
 import passkey
 import requests
 import config
-from windpowerlib import ModelChain, WindTurbine, create_power_curve
-import Forecast
+from windpowerlib import ModelChain, WindTurbine, create_power_curve,TurbineClusterModelChain, WindTurbineCluster, WindFarm
 import plotly.graph_objects as go
 import plotly.express as px
+import seaborn as sns
 import matplotlib.pyplot as plt
+from bokeh.io import output_file, show
+from bokeh.models import ColumnDataSource, GMapOptions
+from bokeh.plotting import gmap
 import altair as alt
 from windpowerlib import data as wt
-
+import logging
+logging.getLogger().setLevel(logging.DEBUG)
 # Streamlit App Title
-
-
-st.set_page_config(
-    page_title="Wind Turbine Calculator")
-
-st.title("Wind Turbine Analyser and Forecaster")
+st.title("Wind Farm Analyser")
+st.markdown("""
+This application allows users to estimate and forecast power output from proposed 
+wind farm sites. It makes use of the followign resurces.
+* **Windpowerlib Library** : This is a python library which makes use of turbine data and weather foreast data
+ to predict wind turbine and wind farm output.
+* **Open Weather API** : This is an interface which provided weather forecasts for geoloecated places.
+""")
 
 # st.write(""" ### Forecast Model for Lake Turkana Wind
+
 # """)
-@st.cache(ttl=3600, max_entries=10)
-def get_mongo():
-#Read in data from mongo DB documents
-    client = pymongo.MongoClient("mongodb+srv://%s:%s@cluster0.r3enc.mongodb.net/myFirstDatabase?retryWrites=true&w=majority"% (
-    passkey.username, passkey.password))
-
-    db = client.EnergyData
-    collection = db["Lake_Turkana"]
-    #convert data to pandas dataframe
-    data = pd.DataFrame(list(collection.find())).drop_duplicates(subset='Timestamp')
-    #Change 'dt_txt to datetime and set it as index
-
-    data['Timestamp']=pd.to_datetime(data['Timestamp'])
-    data=data.set_index(data['Timestamp'])
-    return data
-data=get_mongo()
-#Initiate selectbox for date selection of start and end dates
-# StartDate=st.sidebar.selectbox("Start Date",data.index)#data.dt_txt)
-# st.write(StartDate)
-
-# EndDate=st.sidebar.selectbox("End Date",data.index)#data.dt_txt)
-# st.write(EndDate)
 st.sidebar.info("Select and Enter Calculation Parameters")
-InputLatitude=st.sidebar.number_input(" Enter Latitude")
-InputLongitude=st.sidebar.number_input(" Enter Longitude")
-WindHeight=st.sidebar.number_input(" Wind MEasurement Height")
-InputrughIndex=st.sidebar.number_input(" Enter Roughness Index")
-
-lat = InputLatitude
-lon = InputLongitude
-urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=metric" % (
-    lat, lon, config.api_key)
-
-# Run requests from the API
-jsonDatas = requests.get(urls).json()
-#CreateDatabase.collection_name.delete_many({"feedin_power_plant": df_vals})
-
-#CreateDatabase.collection_name.insert_many(jsonDatas['list'])
-dat_weath = pd.DataFrame(jsonDatas['list'])
-
-
-# Some of the columns have dictionary values
-# These need to be converted to pandas series
-# and then concatenated into the original dataframe
-main = dat_weath.main.apply(pd.Series)
-wind = dat_weath.wind.apply(pd.Series)
-weather = dat_weath.weather.apply(pd.Series)
-dat_weath = pd.concat([dat_weath, main, wind, weather], axis=1).drop(['main', 'wind',
-                                                                      'weather', 'clouds', 'sys', 0], axis=1)
-
-# Feature Engineering
-# Select fields that windpowerlib accepts as inputs
-dat_weath = dat_weath[['dt_txt', 'speed', 'temp', 'pressure']]
-
-# Rename columns
-dat_weath = dat_weath.rename(
-    columns={'speed': 'wind_speed', 'temp': 'temperature', 'pressure': 'pressure'})
-# Set index
-dat_weath=dat_weath.rename(columns={'dt_txt':'Timestamp'})
-dat_weath = dat_weath.set_index('Timestamp')
-weather_dat=dat_weath.copy().reset_index()
-
-
-# set a value to roughness index and windspeed measurement height
-dat_weath['roughness_length'] = InputrughIndex
-dat_weath['height'] = WindHeight
-# Input requires multilevel index
-dat_weath = dat_weath.set_index('height', append=True).unstack('height')
-
-
-################################################################################
-# ----------------------------------------------------------------------------
-# Windpowerlib has a library of wind turbines, if turbine does not exist, it can be created
-# specification of  wind turbine
-# #Created by defining nominal power, hub height, and power curve values
-# (Note: power curve values and
-# nominal power have to be in Watt)
-
-
-@st.cache(ttl=3600, max_entries=10)
+# @st.cache
 def turbinedata():
     #Select Turbine
     turbines = wt.get_turbine_types(print_out=False)
@@ -113,102 +39,244 @@ def turbinedata():
 turbines=turbinedata()
 TurbineMake=turbines.manufacturer.drop_duplicates()
 
-MakeSelect=st.sidebar.selectbox("Select Turbine Make",TurbineMake)#data.dt_txt)
-st.write(MakeSelect)
-TurbineModel= turbinedata()['turbine_type'].loc[turbinedata()['manufacturer']== MakeSelect]
-ModelSelect=st.sidebar.selectbox("Select Turbine Model",TurbineModel)#data.dt_txt)
-st.write(ModelSelect)
 
+col1, col2 = st.columns(2)
+with col1:
+    MakeSelect=st.selectbox("Select Turbine Make",TurbineMake)#data.dt_txt)
+    st.write(MakeSelect)
+with col2:
+    TurbineModel= turbines ['turbine_type'].loc[turbines ['manufacturer']== MakeSelect]
+    ModelSelect=st.selectbox("Select Turbine Model",TurbineModel)#data.dt_txt)
+    st.write(ModelSelect)
 
-@st.cache(ttl=3600, max_entries=10)
+#Hub Height Selector
+@st.cache
 def hubrange(a,b,c):
-    min=a
+    minval=a
     defaultval=b
     maxval=c
-    return min,defaultval,maxval
-min,defaultval,maxval= hubrange(0,0,100)
-HubHeight=st.sidebar.slider("Select Hub Height",0,0,100)
+    return minval,defaultval,maxval
+minval,defaultval,maxval= hubrange(0,0,100)
 
-TurbineChoice = {
-    "turbine_type": ModelSelect,  # turbine type as in register
-    "hub_height": HubHeight,  # in m
-}
-Turbine = WindTurbine(**TurbineChoice)
+#User inputs
+# myForm=st.sidebar.form(key="my_form")
+# WindFarmName=myForm.text_input(" Enter Farm Name")
+# InputLatitude=myForm.number_input(" Enter Latitude")
+# InputLongitude=myForm.number_input(" Enter Longitude")
+# InputRoughLength=myForm.number_input(" Enter Roughness Length")
+# NoTurbines=myForm.number_input(" Enter Turbine Qty")
+# WindHeight=myForm.number_input(" Wind Measurement Height")
+# HubHeight=myForm.slider("Select Hub Height",minval,defaultval,maxval)
+# FarmEfficiency=myForm.number_input(" Farm Efficiency")
+# submit=myForm.form_submit_button("Submit")
 
-######################################################################
-# -----------------------------------------------------------------------
-# The ModelChain is a class that provides all necessary steps to calculate the power output of a wind turbine. When calling the 'run_model' method, first the wind speed and density (if necessary) at hub height are calculated and
-#  then used to calculate the power output.
-#   You can either use the default methods for the calculation steps,
-#   as done for 'my_turbine', or choose different methods, as done for the 'e126'.
-#    Of course, you can also use the default methods while only changing one or two of them,
-#     as done for 'my_turbine2'.
+#####################################################################333333
+myForm=st.sidebar.form(key="my_form")
+WindFarmName=myForm.text_input(" Enter Farm Name")
+InputLatitude=myForm.number_input(" Enter Latitude")
+InputLongitude=myForm.number_input(" Enter Longitude")
+InputRoughLength=myForm.number_input(" Enter Roughness Length")
+NoTurbines=myForm.number_input(" Enter Turbine Qty")
+WindHeight=myForm.number_input(" Wind Measurement Height")
+HubHeight=myForm.slider("Select Hub Height",minval,defaultval,maxval)
+FarmEfficiency=myForm.number_input(" Farm Efficiency")
+submit=myForm.form_submit_button("Submit")
 
 
-# own specifications for ModelChain setup
-# modelchain_data = {
-#     'wind_speed_model': 'logarithmic',      # 'logarithmic' (default),
-#                                             # 'hellman' or
-#                                             # 'interpolation_extrapolation'
-#     # 'barometric' (default), 'ideal_gas'
-#     'density_model': 'ideal_gas',
-#                                             #  or 'interpolation_extrapolation'
-#     'temperature_model': 'linear_gradient',  # 'linear_gradient' (def.) or
-#                                             # 'interpolation_extrapolation'
-#     'power_output_model':
-#         'power_coefficient_curve',          # 'power_curve' (default) or
-#                                             # 'power_coefficient_curve'
-#     'density_correction': True,             # False (default) or True
-#     'obstacle_height': 0,                   # default: 0
-#     'hellman_exp': None}                    # None (default) or None
 
-mc_example_turbine = ModelChain(
-    Turbine,
-    wind_speed_model='hellman').run_model(dat_weath)
-Turbine.power_output = mc_example_turbine.power_output
+if submit:
+    #Load Weather Data
+    @st.cache
+    def loadWeatherData():
+        lat = InputLatitude
+        lon = InputLongitude
+        urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=standard" % (lat, lon, config.api_key)
+        # Run requests from the API
+        jsonDatas = requests.get(urls).json()
+        dat_weath = pd.DataFrame(jsonDatas['list'])
 
-#######################################################33
+        # Some of the fields have values in dictionary format
+        # These need to be converted to pandas series
+        # and then concatenated into the original dataframe
+        main = dat_weath.main.apply(pd.Series)
+        wind = dat_weath.wind.apply(pd.Series)
+        weather = dat_weath.weather.apply(pd.Series)
+        WeatherPart = pd.concat([dat_weath, main, wind, weather], axis=1).drop(['main', 'wind',
+                                                                    'weather', 'clouds', 'sys', 0], axis=1)
+        # Data Preparation
+        # Select fields that windpowerlib accepts as inputs
+        dat_weath = WeatherPart[['dt_txt', 'speed', 'temp', 'pressure']]
+        # Rename columns
+        dat_weath = dat_weath.rename(
+        columns={'speed': 'wind_speed', 'temp': 'temperature', 'pressure': 'pressure'})
+        # Set index
+        dat_weath=dat_weath.rename(columns={'dt_txt':'Timestamp'})
+        dat_weath = dat_weath.set_index('Timestamp')        
+        # set a value to windspeed measurement height
+        #Also set value for roughness Length
+        dat_weath['roughness_length'] = InputRoughLength
+        dat_weath['height'] = WindHeight
+        # Input requires multilevel index
+        dat_weath = dat_weath.set_index('height', append=True).unstack('height')
+        return dat_weath
+    dat_weath=loadWeatherData()
 
-Turbine.power_output = (Turbine.power_output)/10**6
-Turbine.power_output
-@st.cache()
-def outputdat():
+    ################################################################################
+    # ----------------------------------------------------------------------------
+    # Windpowerlib has a library of wind turbines, if turbine does not exist, it can be created
+    # specification of  wind turbine
+    # #Created by defining nominal power, hub height, and power curve values
+    # (Note: power curve values and
+    # nominal power have to be in Watt)
 
-    Pout = Turbine.power_output.reset_index()
-    Pout['timestamp_local'] = pd.to_datetime(Pout['Timestamp'])
-    Pout.set_index('timestamp_local', inplace=True)
-    #Drop "_id" column added by mongoDB as a document field identifier
-    # Pout=Pout.drop(columns='_id')
-    #Drop duplicates
-    Pout=Pout.drop_duplicates(subset='Timestamp')
-    return Pout
-Pout=outputdat()
-PoutDisp=st.dataframe(Pout)
+    TurbineChoice = {
+        "turbine_type": ModelSelect,  # turbine type as in register
+        "hub_height": HubHeight,  # in m
+    }
+    Turbine = WindTurbine(**TurbineChoice)
+    
 
-###################################################################
+    ###########################################################333
 
-PowerPlot = px.line(outputdat(),
-    x=Pout.index, y=Pout.feedin_power_plant,
-    color_discrete_sequence=["red"],
-    title='Forecast Power Production',
-    labels={'feedin_power_plant': 'Power Output(MW)'},
-    height=550,width=900)
+    # specification of wind farm data where turbine fleet is provided in a
+    # pandas.DataFrame
+    # for each turbine type you can either specify the number of turbines of
+    # that type in the wind farm (float values are possible as well) or the
+    # total installed capacity of that turbine type in W
+    # FarmFleet = pd.DataFrame(
+    #         {'wind_turbine': [Turbine],  # as windpowerlib.WindTurbine
+    #          'number_of_turbines':[NoTurbines],
+    #          'total_capacity': [None]}
+    #     )
+    # # initialize WindFarm object
+    # MyFarm = WindFarm(name=WindFarmName,
+    #                         wind_turbine_fleet=FarmFleet)
 
-st.plotly_chart(PowerPlot)
+    ##############################################################333####3
 
-##################################################################################
-Forecast.weather_dat=Forecast.weather_dat.drop_duplicates()
-Forecast.weather_dat['date']=pd.to_datetime(Forecast.weather_dat['Timestamp'])
-Forecast.weather_dat=Forecast.weather_dat.set_index('date')
-# Forecast.weather_dat=Forecast.weather_dat[StartDate:EndDate]
-WeatherPlot = px.line(Forecast.weather_dat,
-    x=Forecast.weather_dat.Timestamp, y=Forecast.weather_dat.wind_speed,
-    title='Site Wind Speed Over Time',
-    labels={'dt_txt':'Date','wind_speed': 'Wind Speed(m/s)'},
-    height=550,width=900)
-WeatherPlot["layout"].pop("updatemenus")
-# WeatherPlot.show()
-#WeatherPlot["layout"].pop("updatemenus")
+    FarmData= {
+        'name': WindFarmName,
+        'wind_turbine_fleet': [Turbine.to_group(NoTurbines)],
+        'efficiency': FarmEfficiency}
 
-st.plotly_chart(WeatherPlot)
+    # initialize WindFarm object
+    WindFarmCalc= WindFarm(**FarmData)
 
+    # power output calculation for user farm
+    # initialize TurbineClusterModelChain with default parameters and use
+    # run_model method to calculate power output
+    mc_example_farm = TurbineClusterModelChain(WindFarmCalc).run_model(dat_weath)
+    # write power output time series to WindFarm object
+    WindFarmCalc.power_output = (mc_example_farm.power_output)/10**6
+
+    st.header("Analysis Output", anchor=None)
+  
+    # @st.cache()
+    def outputdat():
+
+        Pout = WindFarmCalc.power_output.reset_index()
+        Pout['timestamp_local'] = pd.to_datetime(Pout['Timestamp'])
+        Pout.set_index('timestamp_local', inplace=True)
+        return Pout
+    Pout=outputdat()
+    colz1,colz2,colz3,colz4=st.columns(4)
+
+    #Obtain Turbine Rating
+    TurbineRating=int(TurbineChoice.get('turbine_type').split('/')[1])
+    with colz1:
+        MedianPower=st.metric(label="Av. Forecast Power(MW)",value=round(Pout['feedin_power_plant'].mean(),2))
+    with colz2:
+        CapcityFactor=st.metric(label="Capacity Factor",value=round((1000*Pout['feedin_power_plant'].median()/(NoTurbines*TurbineRating)),2))
+    with colz3:
+        PoutDisp=st.metric(label="Max Forecast Power(MW)",value=round(Pout['feedin_power_plant'].max(),2))
+    with colz4:
+        PRating=st.metric(label="Rated Capacity(MW)",value=round(NoTurbines*TurbineRating/10**3,2))
+
+    ###########################################################################
+
+    c = alt.Chart(Pout).mark_area(opacity=0.7, color='#FF0000').encode(
+    x='Timestamp', y='feedin_power_plant').properties(
+    width=700,
+    height=450,title='Forecast Power Production for '+str(WindFarmName)+' Wind Farm')
+    st.write(c)
+    
+
+   
+    reweather=pd.melt(dat_weath.reset_index(), col_level=0, id_vars=['Timestamp','wind_speed','temperature','pressure'])
+    #st.write(reweather.head())
+    
+
+
+    SpeedPlot = px.line(reweather,
+        x=reweather.Timestamp, y=reweather.wind_speed,
+        color_discrete_sequence=["red"],
+        title='Wind Speed Forecast for '+str(WindFarmName)+' Wind Farm',
+        labels={'wind_speed': 'Wind Speed(m/s)'},height=500,
+        width=800)
+    st.write(SpeedPlot)
+
+    combined=pd.merge(Pout,reweather,on=['Timestamp']).drop(columns='value')
+
+    cols1,cols2=st.columns(2)
+    corr=combined.corr()
+
+    
+        
+    corrplot = px.imshow(corr)
+    st.markdown(""" #### Correlation Matrix of Power and Weather Variables""")
+    st.write(corrplot)
+    with cols1:
+        powerhist= alt.Chart(combined).mark_bar().encode(
+            alt.X("feedin_power_plant:Q", bin=True),
+            y='count()',
+)       
+        st.markdown(""" #### Energy Output Histogram """)
+        st.write(powerhist)
+    with cols2:
+        scatChart=alt.Chart(combined).mark_circle(
+    color='red',
+    opacity=0.3
+).encode(
+    x='wind_speed:Q',
+    y='feedin_power_plant:Q'
+)
+        st.markdown(""" #### Wind Farm Power Curve """)
+        st.write(scatChart)
+
+    # px.bar(reweather,
+    # x=reweather.Timestamp, y=reweather.wind_speed,
+    # color_discrete_sequence=["red"],
+    # title='Wind Speed Forecast for '+str(WindFarmName)+' Wind Farm',
+    # labels={'wind_speed': 'Wind Speed(m/s)'},height=500,
+    # width=800)
+    # st.write(SpeedPlot)
+    # st.table(combined.head())
+
+        # Plot the data
+
+
+    # c = alt.Chart(Pout).mark_line().encode(
+    #     x='Timestamp', y='feedin_power_plant').properties(
+    # width=700,
+    # height=500,title='Forecast Power Production for '+str(WindFarmName)+' Wind Farm')
+    # st.write(c)
+
+    
+    # # ##################################################################################
+    
+     
+    
+    # # # WeatherDat=WeatherDat.drop_duplicates()
+    # # WeatherDat['date']=pd.to_datetime(WeatherDat['dt_txt'])
+    # # WeatherDat=WeatherDat.set_index('date')
+    # # # Forecast.weather_dat=Forecast.weather_dat[StartDate:EndDate]
+    # # WeatherPlot = px.line(WeatherDat,
+    # #     x=WeatherDat.dt_txt, y=WeatherDat.speed,
+    # #     title='Site Wind Speed Over Time',
+    # #     labels={'dt_txt':'Date','wind_speed': 'Wind Speed(m/s)'},
+    # #     height=450,width=700)
+    # # WeatherPlot["layout"].pop("updatemenus")
+    # # # WeatherPlot.show()
+    # # #WeatherPlot["layout"].pop("updatemenus")
+
+    # # st.plotly_chart(WeatherPlot)
