@@ -12,8 +12,8 @@ import os
 
 lat = 2
 lon = 35.5
-urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=standard" % (lat, lon,st.secrets["api_key"])
-
+api_key=st.secrets["api_key"]
+urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=standard" % (lat, lon,api_key)
 
 # Streamlit App Title
 st.title("Wind Farm Analyser")
