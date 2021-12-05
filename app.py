@@ -72,13 +72,13 @@ Calculate=myForm.form_submit_button("Calculate")
 #If the user clicks the calculate button, then the rest of the script is executed
 if Calculate:
     #Load Weather Data
-    @st.cache
+    lat = InputLatitude
+    lon = InputLongitude
+    api_key=st.secrets['api_key']
+    urls = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={api_key}&units=standard"
+    @st.cache(hash_funcs={"_thread.RLock": lambda _: None})
     def loadWeatherData():
-        lat = InputLatitude
-        lon = InputLongitude
-        urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=686a8268d2d60adfa1efd1b0f3d7ffe5&units=standard" % (lat, lon)
-        print(urls)
-        # Run requests from the API
+
         jsonDatas = requests.get(urls).json()
         dat_weath = pd.DataFrame(jsonDatas['list'])
 
