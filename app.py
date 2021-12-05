@@ -221,4 +221,5 @@ if Calculate:
 )
         st.markdown(""" #### Wind Farm Power Curve """)
         st.write(scatChart)
-    st.map(combined)
+    st.markdown(""" #### Location Map """)
+    st.map(combined,zoom=12)
