@@ -27,7 +27,7 @@ st.markdown(
     font-family: monospace;
 }
 [class^="st-b"]  {
-    color: white;
+    color: black;
     font-family: monospace;
 }
 .st-bb {
