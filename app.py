@@ -23,7 +23,7 @@ st.markdown(
     color: black;
 }
 .Widget>label {
-    color: white;
+    color: black;
     font-family: monospace;
 }
 [class^="st-b"]  {
