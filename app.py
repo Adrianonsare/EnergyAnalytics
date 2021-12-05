@@ -10,10 +10,10 @@ import altair as alt
 from windpowerlib import data as wt
 import os 
 
-lat = 2
-lon = 35.5
-api_key=st.secrets["api_key"]
-urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=standard" % (lat, lon,api_key)
+# lat = 2
+# lon = 35.5
+# api_key=st.secrets["api_key"]
+# urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=%s&units=standard" % (lat, lon,api_key)
 
 # Streamlit App Title
 st.title("Wind Farm Analyser")
@@ -76,7 +76,7 @@ if Calculate:
     def loadWeatherData():
         lat = InputLatitude
         lon = InputLongitude
-        urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=st.secrets[api_key]&units=standard" % (lat, lon)
+        urls = "https://api.openweathermap.org/data/2.5/forecast?lat=%s&lon=%s&appid=686a8268d2d60adfa1efd1b0f3d7ffe5&units=standard" % (lat, lon)
         print(urls)
         # Run requests from the API
         jsonDatas = requests.get(urls).json()
@@ -193,6 +193,8 @@ if Calculate:
     st.write(SpeedPlot)
 
     combined=pd.merge(Pout,reweather,on=['Timestamp']).drop(columns='value')
+    combined['lat']=InputLatitude
+    combined ['lon']=InputLongitude
 
     cols1,cols2=st.columns(2)
     corr=combined.corr()
@@ -219,3 +221,4 @@ if Calculate:
 )
         st.markdown(""" #### Wind Farm Power Curve """)
         st.write(scatChart)
+    st.map(combined)
