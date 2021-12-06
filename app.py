@@ -237,7 +237,7 @@ if Calculate:
     combined ['lon']=InputLongitude
 
     cols1,cols2=st.columns(2)
-    corr=combined.corr()
+    corr=(combined.drop(columns=(['lat','lon']))).corr()
 
     
     #Correlation matrix
