@@ -34,13 +34,13 @@ st.markdown(
     background-color: transparent;
 }
 .st-at {
-    background-color: #0c0080;
+    background-color: #c8c8cc;
 }
 footer {
     font-family: monospace;
 }
 .reportview-container .main footer, .reportview-container .main footer a {
-    color: #838387;
+    color: #c8c8cc;
 }
 header .decoration {
     background-image: none;
