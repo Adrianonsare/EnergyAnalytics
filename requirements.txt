@@ -2,6 +2,7 @@ altair==4.1.0
 bkcharts==0.2
 pandas==1.2.4
 plotly==5.4.0
+protobuf==3.19.0
 snuggs==1.4.7
 streamlit==1.2.0
 windlib==1.8.0
